@@ -1,0 +1,114 @@
+:root {
+  --font-heading: "Montserrat", sans-serif;
+  --font-body: "Nunito", sans-serif;
+
+  --color-primary: #c76108;
+  --color-primary-dark: #a94f06;
+  --color-primary-light: #e07a1f;
+
+  --color-bg-body: #fafafa;
+  --color-bg-content: #ffffff;
+
+  --color-text-primary: #333333;
+  --color-text-heading: #222222;
+
+  --color-border: #e0e0e0;
+}
+
+/* Base */
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg-body);
+  color: var(--color-text-primary);
+}
+
+.main-container {
+  padding-top: 6rem;
+  padding-bottom: 3rem;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  color: var(--color-text-heading);
+  font-weight: 600;
+}
+
+/* Navbar */
+
+.bg-theme {
+  background-color: var(--color-primary);
+}
+
+.navbar-brand {
+  font-family: var(--font-heading);
+  letter-spacing: 0.5px;
+}
+
+.site-header .nav-link {
+  color: rgba(255, 255, 255, 0.85);
+  transition: opacity 0.2s ease;
+}
+
+.site-header .nav-link:hover {
+  opacity: 1;
+}
+
+/* Card principal (onde ficará a calculadora) */
+
+.content-section {
+  background: var(--color-bg-content);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* Botões */
+
+.btn-primary {
+  --bs-btn-bg: var(--color-primary);
+  --bs-btn-border-color: var(--color-primary);
+  --bs-btn-hover-bg: var(--color-primary-dark);
+  --bs-btn-hover-border-color: var(--color-primary-dark);
+  --bs-btn-active-bg: var(--color-primary-dark);
+  --bs-btn-active-border-color: var(--color-primary-dark);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--color-primary);
+  --bs-btn-border-color: var(--color-primary);
+  --bs-btn-hover-bg: var(--color-primary);
+  --bs-btn-hover-border-color: var(--color-primary);
+}
+
+/* Footer */
+
+.footer-theme {
+  background-color: #f2f2f2;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Resultado da calculadora */
+
+.result-box {
+  background: #fff7f0;
+  border-left: 4px solid var(--color-primary);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+/* Dark mode */
+
+[data-bs-theme="dark"] {
+  --color-bg-body: #1e1e1e;
+  --color-bg-content: #2a2a2a;
+  --color-text-primary: #e4e4e4;
+  --color-text-heading: #ffffff;
+  --color-border: #3a3a3a;
+}
+
+[data-bs-theme="dark"] .footer-theme {
+  background-color: #1a1a1a;
+}

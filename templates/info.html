@@ -1,0 +1,185 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+  <h2 class="mb-4">Calculadora de Diárias por Competência</h2>
+
+  <form id="calc-form" class="row g-3">
+
+    <div class="col-md-6">
+      <label class="form-label">Data de Início</label>
+      <input type="date" class="form-control" id="start" required>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Data de Fim</label>
+      <input type="date" class="form-control" id="end" required>
+    </div>
+
+    <!-- 🔎 Campo com autocomplete -->
+    <div class="col-12 position-relative">
+      <label class="form-label">Procedimento</label>
+      <input type="text"
+             class="form-control"
+             id="proc-input"
+             placeholder="Digite código ou nome"
+             autocomplete="off"
+             required>
+
+      <div id="proc-dropdown" class="list-group position-absolute w-100 shadow d-none"
+           style="z-index:1000; max-height:250px; overflow-y:auto;">
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">
+        Calcular
+      </button>
+    </div>
+
+  </form>
+
+  <div id="result" class="result-box d-none"></div>
+
+</div>
+
+<script>
+
+let selectedProc = null;
+let currentFocus = -1;
+
+const input = document.getElementById("proc-input");
+const dropdown = document.getElementById("proc-dropdown");
+
+function closeDropdown() {
+  dropdown.classList.add("d-none");
+  dropdown.innerHTML = "";
+  currentFocus = -1;
+}
+
+function setActive(items) {
+  items.forEach(item => item.classList.remove("active"));
+  if (currentFocus >= 0 && items[currentFocus]) {
+    items[currentFocus].classList.add("active");
+    items[currentFocus].scrollIntoView({ block: "nearest" });
+  }
+}
+
+input.addEventListener("input", async function() {
+  const query = this.value.trim();
+  selectedProc = null;
+
+  if (query.length < 2) {
+    closeDropdown();
+    return;
+  }
+
+  const response = await fetch(`/api/procedimentos/search?q=${query}`);
+  const data = await response.json();
+
+  dropdown.innerHTML = "";
+
+  data.proclist.forEach(proc => {
+    const item = document.createElement("a");
+    item.className = "list-group-item list-group-item-action";
+    item.innerHTML = `<strong>${proc.codigo}</strong> - ${proc.nome}
+                      <span class="badge bg-secondary float-end">
+                        MP: ${proc.media_perm}
+                      </span>`;
+
+    item.addEventListener("click", () => {
+      selectedProc = proc;
+      input.value = `${proc.codigo} - ${proc.nome}`;
+      closeDropdown();
+    });
+
+    dropdown.appendChild(item);
+  });
+
+  dropdown.classList.remove("d-none");
+});
+
+input.addEventListener("keydown", function(e) {
+  const items = dropdown.querySelectorAll(".list-group-item");
+
+  if (e.key === "ArrowDown") {
+    currentFocus++;
+    if (currentFocus >= items.length) currentFocus = 0;
+    setActive(items);
+    e.preventDefault();
+  }
+
+  if (e.key === "ArrowUp") {
+    currentFocus--;
+    if (currentFocus < 0) currentFocus = items.length - 1;
+    setActive(items);
+    e.preventDefault();
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (currentFocus >= 0 && items[currentFocus]) {
+      items[currentFocus].click();
+    }
+  }
+});
+
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".position-relative")) {
+    closeDropdown();
+  }
+});
+
+document.getElementById("calc-form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  if (!selectedProc) {
+    alert("Selecione um procedimento válido.");
+    return;
+  }
+
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+
+  const response = await fetch("/api/calc/", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      start: start,
+      end: end,
+      proc: selectedProc.codigo
+    })
+  });
+
+  const data = await response.json();
+  const resultDiv = document.getElementById("result");
+
+  resultDiv.classList.remove("d-none");
+
+  let html = `
+    <div class="alert alert-warning d-flex justify-content-between">
+      <strong>Perm. à maior</strong>
+      <span class="fw-bold">${data.perm}</span>
+    </div>
+  `;
+
+  html += "<ul class='list-group'>";
+  const orderedKeys = Object.keys(data.competencias).sort();
+
+  orderedKeys.forEach(key => {
+    html += `
+      <li class="list-group-item d-flex justify-content-between">
+        ${key}
+        <span class="fw-bold">${data.competencias[key]}</span>
+      </li>
+    `;
+  });
+
+  html += "</ul>";
+
+  resultDiv.innerHTML = html;
+});
+
+</script>
+
+{% endblock %}

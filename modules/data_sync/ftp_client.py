@@ -1,0 +1,1 @@
+# Lógica de conexão e download (FTP)

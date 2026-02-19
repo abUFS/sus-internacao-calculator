@@ -1,0 +1,275 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+
+  <h2 class="mb-4">Calculadora de Diárias por Competência</h2>
+
+  <form id="calc-form" class="row g-3">
+
+    <!-- Internação -->
+    <div class="col-md-6">
+      <label class="form-label">Data de Início</label>
+      <input type="date" class="form-control" id="start" required>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Data de Fim</label>
+      <input type="date" class="form-control" id="end" required>
+    </div>
+
+    <!-- Procedimento (com autocomplete) -->
+    <div class="col-12 position-relative">
+      <label class="form-label">Procedimento</label>
+      <input type="text"
+             class="form-control"
+             id="proc-input"
+             placeholder="Digite código ou nome"
+             autocomplete="off"
+             required>
+
+      <div id="proc-dropdown" class="list-group position-absolute w-100 shadow d-none"
+           style="z-index:1000; max-height:250px; overflow-y:auto;">
+      </div>
+    </div>
+
+    <!-- UTI -->
+    <div class="col-12">
+      <label class="form-label">Períodos em UTI (opcional)</label>
+      <div id="uti-container"></div>
+
+      <button type="button"
+              class="btn btn-outline-primary btn-sm mt-2"
+              onclick="addUtiRow()">
+        + Adicionar período UTI
+      </button>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">
+        Calcular
+      </button>
+    </div>
+
+  </form>
+
+  <div id="result" class="result-box d-none mt-4"></div>
+
+</div>
+
+<script>
+
+/* ================= AUTO COMPLETE PROCEDIMENTO ================= */
+
+let selectedProc = null;
+let currentFocus = -1;
+
+const input = document.getElementById("proc-input");
+const dropdown = document.getElementById("proc-dropdown");
+
+function closeDropdown() {
+  dropdown.classList.add("d-none");
+  dropdown.innerHTML = "";
+  currentFocus = -1;
+}
+
+function setActive(items) {
+  items.forEach(item => item.classList.remove("active"));
+  if (currentFocus >= 0 && items[currentFocus]) {
+    items[currentFocus].classList.add("active");
+    items[currentFocus].scrollIntoView({ block: "nearest" });
+  }
+}
+
+input.addEventListener("input", async function() {
+  const query = this.value.trim();
+  selectedProc = null;
+
+  if (query.length < 2) {
+    closeDropdown();
+    return;
+  }
+
+  const response = await fetch(`/api/procedimentos/search?q=${query}`);
+  const data = await response.json();
+
+  dropdown.innerHTML = "";
+
+  data.proclist.forEach(proc => {
+    const item = document.createElement("a");
+    item.className = "list-group-item list-group-item-action";
+    item.innerHTML = `<strong>${proc.code}</strong> - ${proc.name}
+                      <span class="badge bg-secondary float-end">
+                        MP: ${proc.avrg_stay}
+                      </span>`;
+
+    item.addEventListener("click", () => {
+      selectedProc = proc;
+      input.value = `${proc.code} - ${proc.name}`;
+      closeDropdown();
+    });
+
+    dropdown.appendChild(item);
+  });
+
+  dropdown.classList.remove("d-none");
+});
+
+input.addEventListener("keydown", function(e) {
+  const items = dropdown.querySelectorAll(".list-group-item");
+
+  if (e.key === "ArrowDown") {
+    currentFocus++;
+    if (currentFocus >= items.length) currentFocus = 0;
+    setActive(items);
+    e.preventDefault();
+  }
+
+  if (e.key === "ArrowUp") {
+    currentFocus--;
+    if (currentFocus < 0) currentFocus = items.length - 1;
+    setActive(items);
+    e.preventDefault();
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (currentFocus >= 0 && items[currentFocus]) {
+      items[currentFocus].click();
+    }
+  }
+});
+
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".position-relative")) {
+    closeDropdown();
+  }
+});
+
+
+/* ================= UTI DINÂMICO ================= */
+
+function addUtiRow() {
+  const container = document.getElementById("uti-container");
+
+  const row = document.createElement("div");
+  row.className = "row g-2 align-items-end mb-2 uti-row";
+
+  row.innerHTML = `
+    <div class="col-md-5">
+      <input type="date" class="form-control uti-start">
+    </div>
+    <div class="col-md-5">
+      <input type="date" class="form-control uti-end">
+    </div>
+    <div class="col-md-2">
+      <button type="button"
+              class="btn btn-outline-danger btn-sm w-100"
+              onclick="this.closest('.uti-row').remove()">
+        Remover
+      </button>
+    </div>
+  `;
+
+  container.appendChild(row);
+}
+
+/* ================= ENVIO FORM ================= */
+
+document.getElementById("calc-form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  if (!selectedProc) {
+    alert("Selecione um procedimento válido.");
+    return;
+  }
+
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+
+  const utiRows = document.querySelectorAll(".uti-row");
+  const itu_periods = [];
+
+  utiRows.forEach(row => {
+    const s = row.querySelector(".uti-start").value;
+    const f = row.querySelector(".uti-end").value;
+
+    if (s && f) {
+      itu_periods.push({ start: s, end: f });
+    }
+  });
+
+  const payload = {
+    hospitalization: {"start": start, "end": end},
+    procediment: selectedProc,
+    itu_periods: itu_periods.length > 0 ? itu_periods : []
+  };
+
+  const response = await fetch("/api/calc/", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  renderResult(data);
+});
+
+/* ================= RESULTADO ================= */
+
+function formatCompetencia(key) {
+  const [year, month] = key.split("-");
+  const date = new Date(year, month - 1);
+  return date.toLocaleString("pt-BR", {
+    month: "short",
+    year: "2-digit"
+  });
+}
+
+function renderResult(data) {
+
+  const resultDiv = document.getElementById("result");
+  resultDiv.classList.remove("d-none");
+
+  let html = `
+    <div class="alert alert-warning d-flex justify-content-between">
+      <strong>Perm. à maior</strong>
+      <span class="fw-bold">${data.perm}</span>
+    </div>
+  `;
+
+  html += `
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Competência</th>
+            <th>Total</th>
+            <th>UTI</th>
+            <th>Efetivo</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  const keys = Object.keys(data.competencias_total).sort();
+
+  keys.forEach(key => {
+    html += `
+      <tr>
+        <td>${formatCompetencia(key)}</td>
+        <td>${data.competencias_total[key] || 0}</td>
+        <td>${data.competencias_UTI[key] || 0}</td>
+        <td>${data.competencias_efetivo[key] || 0}</td>
+      </tr>
+    `;
+  });
+
+  html += "</tbody></table></div>";
+
+  resultDiv.innerHTML = html;
+}
+
+</script>
+
+{% endblock %}
